@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cellular Network Monitor</title>
+
+  <!-- MapLibre GL JS v4 -->
+  <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    #map { position: absolute; inset: 0; }
+
+    /* ── Controls panel (top-left) ────────────────────────────────────── */
+    #controls {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      padding: 14px 16px;
+      min-width: 230px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+    }
+
+    #controls h1 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+
+    .ctrl-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .ctrl-row label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    select, button {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 7px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    select {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+
+    button {
+      background: #3b82f6;
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    button:hover { background: #2563eb; }
+    button:active { background: #1d4ed8; }
+    button:disabled { background: #334155; color: #64748b; cursor: default; }
+
+    #status {
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+      min-height: 16px;
+    }
+    #status.loading { color: #f59e0b; }
+    #status.ok      { color: #22c55e; }
+    #status.error   { color: #ef4444; }
+
+    /* ── Legend (bottom-right) ────────────────────────────────────────── */
+    #legend {
+      position: absolute;
+      bottom: 32px;
+      right: 12px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+    }
+
+    #legend h2 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-bottom: 4px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      opacity: 0.85;
+    }
+
+    /* ── MapLibre popup overrides ─────────────────────────────────────── */
+    .maplibregl-popup-content {
+      background: #1e293b !important;
+      color: #e2e8f0 !important;
+      border-radius: 10px !important;
+      padding: 0 !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+      min-width: 220px;
+    }
+    .maplibregl-popup-close-button {
+      color: #94a3b8 !important;
+      font-size: 18px !important;
+      top: 6px !important;
+      right: 8px !important;
+    }
+    .maplibregl-popup-tip { border-top-color: #1e293b !important; }
+
+    .popup-header {
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .popup-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .badge-vp  { background: rgba(215,48,39,0.25);  color: #f87171; }
+    .badge-po  { background: rgba(252,141,89,0.25); color: #fb923c; }
+    .badge-fa  { background: rgba(254,224,144,0.25);color: #fbbf24; }
+    .badge-go  { background: rgba(145,207,96,0.25); color: #86efac; }
+    .badge-ex  { background: rgba(26,152,80,0.25);  color: #4ade80; }
+
+    .popup-score-value {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .popup-table {
+      width: 100%;
+      border-collapse: collapse;
+      padding: 8px 0;
+    }
+
+    .popup-table td {
+      padding: 5px 16px;
+      font-size: 12px;
+    }
+    .popup-table td:first-child {
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .popup-table td:last-child {
+      color: #e2e8f0;
+      text-align: right;
+    }
+    .popup-table tr:not(:last-child) td {
+      border-bottom: 1px solid #1e293b;
+    }
+
+    /* ── Attribution override ─────────────────────────────────────────── */
+    .maplibregl-ctrl-attrib {
+      background: rgba(15,23,42,0.7) !important;
+      color: #64748b !important;
+    }
+    .maplibregl-ctrl-attrib a { color: #94a3b8 !important; }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <!-- Controls panel -->
+  <div id="controls">
+    <h1>Network Monitor</h1>
+
+    <div class="ctrl-row">
+      <label>Operatör</label>
+      <select id="operator-select">
+        <option value="28601">Turkcell (28601)</option>
+        <option value="28602">Vodafone TR (28602)</option>
+        <option value="28603">Turk Telekom (28603)</option>
+      </select>
+    </div>
+
+    <div class="ctrl-row">
+      <button id="refresh-btn">Haritayı Yenile</button>
+    </div>
+
+    <div id="status">Harita yükleniyor...</div>
+  </div>
+
+  <!-- Legend -->
+  <div id="legend">
+    <h2>Kalite Skoru</h2>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#d73027;"></div>
+      <span>1.0 – 2.0 &nbsp; Very Poor</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#fc8d59;"></div>
+      <span>2.0 – 3.0 &nbsp; Poor</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#fee090;"></div>
+      <span>3.0 – 4.0 &nbsp; Fair</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#91cf60;"></div>
+      <span>4.0 – 4.5 &nbsp; Good</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#1a9850;"></div>
+      <span>4.5 – 5.0 &nbsp; Excellent</span>
+    </div>
+  </div>
+
+  <script>
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    const QUALITY_COLORS = [
+      [2.0, '#d73027'],   // Very Poor
+      [3.0, '#fc8d59'],   // Poor
+      [4.0, '#fee090'],   // Fair
+      [4.5, '#91cf60'],   // Good
+      [5.1, '#1a9850'],   // Excellent
+    ];
+
+    function scoreToLabel(score) {
+      if (score == null) return 'N/A';
+      if (score < 2.0) return 'Very Poor';
+      if (score < 3.0) return 'Poor';
+      if (score < 4.0) return 'Fair';
+      if (score < 4.5) return 'Good';
+      return 'Excellent';
+    }
+
+    function scoreToBadgeClass(score) {
+      if (score == null) return 'badge-vp';
+      if (score < 2.0) return 'badge-vp';
+      if (score < 3.0) return 'badge-po';
+      if (score < 4.0) return 'badge-fa';
+      if (score < 4.5) return 'badge-go';
+      return 'badge-ex';
+    }
+
+    function fmt(val, unit, digits = 1) {
+      return val != null ? `${Number(val).toFixed(digits)} ${unit}` : '—';
+    }
+
+    function setStatus(msg, cls = '') {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = cls;
+    }
+
+    // ── Map initialisation ────────────────────────────────────────────────────
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      // Carto Positron — free, light, no API key required
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      center: [29.01, 41.015],   // Istanbul
+      zoom: 12,
+      maxZoom: 18,
+      minZoom: 5,
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+    // ── Heatmap data loading ──────────────────────────────────────────────────
+
+    let activeOperator = document.getElementById('operator-select').value;
+    let loadPending = false;
+
+    async function loadHeatmap() {
+      if (loadPending) return;
+      loadPending = true;
+
+      const btn = document.getElementById('refresh-btn');
+      btn.disabled = true;
+      setStatus('Veri yükleniyor...', 'loading');
+
+      const b = map.getBounds();
+      const bbox = [
+        b.getWest().toFixed(6),
+        b.getSouth().toFixed(6),
+        b.getEast().toFixed(6),
+        b.getNorth().toFixed(6),
+      ].join(',');
+
+      const url = `/api/v1/heatmap?bbox=${bbox}&operator_id=${activeOperator}`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        map.getSource('heatmap').setData(data);
+
+        const n = data.features.length;
+        setStatus(
+          n > 0 ? `${n} hücre görüntüleniyor` : 'Bu alanda veri yok',
+          n > 0 ? 'ok' : '',
+        );
+      } catch (err) {
+        console.error('Heatmap fetch error:', err);
+        setStatus(`Hata: ${err.message}`, 'error');
+      } finally {
+        loadPending = false;
+        btn.disabled = false;
+      }
+    }
+
+    // ── Map load → add source & layers ───────────────────────────────────────
+
+    map.on('load', () => {
+      // GeoJSON source — starts empty, filled by loadHeatmap()
+      map.addSource('heatmap', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Fill layer — colored by quality_score with step expression
+      map.addLayer({
+        id: 'heatmap-fill',
+        type: 'fill',
+        source: 'heatmap',
+        paint: {
+          'fill-color': [
+            'step',
+            // coalesce guards against null quality_score → falls to < 2 bin
+            ['coalesce', ['get', 'quality_score'], 0],
+            '#d73027',      // default (< 2.0): Very Poor — red
+            2.0, '#fc8d59', // 2.0–3.0: Poor — orange
+            3.0, '#fee090', // 3.0–4.0: Fair — yellow
+            4.0, '#91cf60', // 4.0–4.5: Good — light green
+            4.5, '#1a9850', // 4.5–5.0: Excellent — dark green
+          ],
+          'fill-opacity': [
+            // confidence_score drives opacity: low confidence → more transparent
+            'interpolate', ['linear'],
+            ['coalesce', ['get', 'confidence_score'], 0.3],
+            0.0, 0.20,   // no confidence  → very transparent
+            0.5, 0.55,   // medium          → semi-transparent
+            1.0, 0.75,   // high confidence → mostly solid
+          ],
+        },
+      });
+
+      // Outline layer — thin border on each hex
+      map.addLayer({
+        id: 'heatmap-outline',
+        type: 'line',
+        source: 'heatmap',
+        paint: {
+          'line-color': 'rgba(50,50,50,0.35)',
+          'line-width': 0.8,
+        },
+      });
+
+      // Hover highlight layer
+      map.addLayer({
+        id: 'heatmap-hover',
+        type: 'fill',
+        source: 'heatmap',
+        paint: {
+          'fill-color': 'rgba(255,255,255,0.12)',
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            1, 0,
+          ],
+        },
+      });
+
+      // Load initial data
+      loadHeatmap();
+    });
+
+    // ── Popup on click ────────────────────────────────────────────────────────
+
+    let activePopup = null;
+
+    map.on('click', 'heatmap-fill', (e) => {
+      const p = e.features[0].properties;
+
+      const qs     = p.quality_score   != null ? Number(p.quality_score)   : null;
+      const rsrp   = p.aggregated_rsrp != null ? Number(p.aggregated_rsrp) : null;
+      const rsrq   = p.aggregated_rsrq != null ? Number(p.aggregated_rsrq) : null;
+      const sinr   = p.aggregated_sinr != null ? Number(p.aggregated_sinr) : null;
+      const conf   = p.confidence_score!= null ? Number(p.confidence_score): null;
+      const cnt    = p.sample_count    != null ? p.sample_count            : null;
+      const tbkt   = p.time_bucket;
+
+      const label  = scoreToLabel(qs);
+      const badge  = scoreToBadgeClass(qs);
+      const timeStr = tbkt ? new Date(tbkt).toLocaleString('tr-TR') : '—';
+
+      const html = `
+        <div class="popup-header">
+          <div class="popup-badge ${badge}">${label}</div>
+          <div class="popup-score-value">${qs != null ? qs.toFixed(2) : '—'} <small style="font-size:13px;color:#64748b">/ 5</small></div>
+        </div>
+        <table class="popup-table">
+          <tr><td>RSRP</td><td>${fmt(rsrp, 'dBm')}</td></tr>
+          <tr><td>RSRQ</td><td>${fmt(rsrq, 'dB')}</td></tr>
+          <tr><td>SINR</td><td>${fmt(sinr, 'dB')}</td></tr>
+          <tr><td>Ornekler</td><td>${cnt ?? '—'}</td></tr>
+          <tr><td>Guven</td><td>${conf != null ? (conf * 100).toFixed(0) + '%' : '—'}</td></tr>
+          <tr><td>Zaman</td><td style="font-size:10px">${timeStr}</td></tr>
+        </table>
+      `;
+
+      if (activePopup) activePopup.remove();
+      activePopup = new maplibregl.Popup({ maxWidth: '260px', offset: 8 })
+        .setLngLat(e.lngLat)
+        .setHTML(html)
+        .addTo(map);
+    });
+
+    // ── Hover state ───────────────────────────────────────────────────────────
+
+    let hoveredId = null;
+
+    map.on('mousemove', 'heatmap-fill', (e) => {
+      map.getCanvas().style.cursor = 'pointer';
+      if (e.features.length === 0) return;
+      const fid = e.features[0].id;
+      if (fid === hoveredId) return;
+      if (hoveredId !== null) {
+        map.setFeatureState({ source: 'heatmap', id: hoveredId }, { hover: false });
+      }
+      hoveredId = fid;
+      map.setFeatureState({ source: 'heatmap', id: hoveredId }, { hover: true });
+    });
+
+    map.on('mouseleave', 'heatmap-fill', () => {
+      map.getCanvas().style.cursor = '';
+      if (hoveredId !== null) {
+        map.setFeatureState({ source: 'heatmap', id: hoveredId }, { hover: false });
+      }
+      hoveredId = null;
+    });
+
+    // ── Reload on map move (debounced) ────────────────────────────────────────
+
+    let moveTimer = null;
+
+    map.on('moveend', () => {
+      clearTimeout(moveTimer);
+      moveTimer = setTimeout(loadHeatmap, 400); // 400ms debounce
+    });
+
+    // ── Controls ──────────────────────────────────────────────────────────────
+
+    document.getElementById('operator-select').addEventListener('change', (e) => {
+      activeOperator = e.target.value;
+      loadHeatmap();
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', loadHeatmap);
+  </script>
+</body>
+</html>
