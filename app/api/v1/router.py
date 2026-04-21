@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints.heatmap import router as heatmap_router
+from app.api.v1.endpoints.insights import router as insights_router
 from app.api.v1.endpoints.measurements import router as measurements_router
 from app.api.v1.endpoints.pipeline import router as pipeline_router
 
@@ -18,3 +19,4 @@ async def health_check() -> dict:
 router.include_router(measurements_router)
 router.include_router(heatmap_router,  prefix="/heatmap")
 router.include_router(pipeline_router, prefix="/pipeline")
+router.include_router(insights_router,  prefix="/insights")

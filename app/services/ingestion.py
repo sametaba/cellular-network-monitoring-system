@@ -93,6 +93,11 @@ async def parse_csv(file: UploadFile) -> tuple[list[RawMeasurementCreate], list[
         )
         df = df.drop(columns=["_mcc", "_mnc"])
 
+    # operator_id must always be a string.  Pandas reads plain numeric CSV
+    # values as int64 (e.g. 28601 → 28601), which fails Pydantic str validation.
+    if "operator_id" in df.columns:
+        df["operator_id"] = df["operator_id"].astype(str)
+
     # Replace sentinel RSRP values with NaN → will become None in Pydantic
     if "rsrp" in df.columns:
         df["rsrp"] = df["rsrp"].apply(

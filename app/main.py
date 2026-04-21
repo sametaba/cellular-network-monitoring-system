@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,5 +59,9 @@ app.add_middleware(
 app.include_router(api_v1_router)
 
 # ── Static frontend — served at /map/ ─────────────────────────────────────────
-# html=True → GET /map/ automatically serves static/index.html
-app.mount("/map", StaticFiles(directory="static", html=True), name="static")
+# html=True → GET /map/ automatically serves static/index.html.
+# Guard: skip mounting if the directory is missing so the API still starts
+# cleanly in Docker CI environments that don't include the built frontend.
+_static_dir = Path("static")
+if _static_dir.is_dir():
+    app.mount("/map", StaticFiles(directory=str(_static_dir), html=True), name="static")

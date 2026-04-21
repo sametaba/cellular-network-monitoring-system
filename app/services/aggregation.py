@@ -48,12 +48,23 @@ from app.services.grid import (
     cell_center,
     h3_to_shapely_polygon,
 )
+from app.models.raw_measurement import Technology
 from app.services.scoring import (
     advanced_composite_score,
     compute_mos,
     compute_network_fitness,
     compute_qoe,
+    score_legacy_technology,
 )
+
+# Technologies that may report non-LTE/NR signal metrics or report no metrics
+# at all.  These receive fallback scoring instead of advanced_composite_score.
+_LEGACY_TECHS = frozenset({
+    Technology.WCDMA,
+    Technology.GSM,
+    Technology.FIVEG,
+    Technology.UNKNOWN,
+})
 from app.services.weights import calculate_weight
 
 # Default H3 resolution used for all aggregation runs.
@@ -205,7 +216,12 @@ async def process_raw_batch(
             rejected += 1
             continue
 
-        q_score = advanced_composite_score(row.rsrp, row.sinr, row.rsrq)
+        if row.technology in _LEGACY_TECHS:
+            q_score: float | None = score_legacy_technology(
+                row.rsrp, row.sinr, row.rsrq, row.technology.value
+            )
+        else:
+            q_score = advanced_composite_score(row.rsrp, row.sinr, row.rsrq)
         weight = calculate_weight(row.precision, row.server_timestamp, row.speed)
 
         valid_updates.append({

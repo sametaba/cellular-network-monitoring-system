@@ -342,3 +342,41 @@ def compute_network_fitness(
             rsrp is not None and rsrp >= -120.0
         ),
     }
+
+
+# ── Legacy / fallback scoring ─────────────────────────────────────────────────
+
+# Neutral quality score returned when a legacy technology provides no usable
+# signal metrics.  Chosen as the midpoint of the 1–5 scale: "acceptable but
+# unverified" rather than penalising the device for using an older RAT.
+NEUTRAL_MOS_FALLBACK: float = 2.5
+
+
+def score_legacy_technology(
+    rsrp: float | None,
+    sinr: float | None,
+    rsrq: float | None = None,
+    technology: str | None = None,  # informational only, not used in maths
+) -> float:
+    """
+    Quality score for WCDMA, GSM, 5G (non-NR) and Unknown measurements.
+
+    Strategy
+    --------
+    1.  If the device reported any usable signal metrics (RSRP / SINR / RSRQ),
+        delegate to ``advanced_composite_score``.  The LTE/5G NR threshold
+        tables are a reasonable proxy for WCDMA (whose RSCP range overlaps
+        heavily with RSRP) and GSM (whose RxLev range is similar).
+
+    2.  If *all* metrics are absent — common for Unknown or stripped-down
+        WCDMA/GSM reports — return the neutral fallback ``NEUTRAL_MOS_FALLBACK``
+        (2.5) instead of None.  This prevents the aggregation engine from
+        treating these rows as unscored and silently dropping their contribution
+        to the grid cell quality estimate.
+
+    Returns a float in [1.0, 5.0].  Never raises; never returns None.
+    """
+    score = advanced_composite_score(rsrp, sinr, rsrq)
+    if score is not None:
+        return score
+    return NEUTRAL_MOS_FALLBACK

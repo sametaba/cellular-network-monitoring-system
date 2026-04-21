@@ -10,8 +10,12 @@ from app.models.base import Base
 
 class Technology(str, enum.Enum):
     """Radio access technology reported by the device."""
-    LTE = "LTE"   # 4G Long Term Evolution
-    NR = "NR"     # 5G New Radio
+    LTE     = "LTE"      # 4G Long Term Evolution
+    NR      = "NR"       # 5G New Radio (3GPP standard identifier)
+    FIVEG   = "5G"       # 5G (legacy mobile-app string — some devices send "5G")
+    WCDMA   = "WCDMA"    # 3G Wideband CDMA
+    GSM     = "GSM"      # 2G Global System for Mobile
+    UNKNOWN = "Unknown"  # Technology not reported / unrecognised
 
 
 class RawMeasurement(Base):

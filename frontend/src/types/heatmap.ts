@@ -14,6 +14,7 @@ export interface HeatmapProperties {
   estimated_mos: number | null
   fit_streaming: boolean | null
   fit_volte: boolean | null
+  is_ai_predicted?: boolean | null
 }
 
 export type HeatmapFeature = Feature<Polygon, HeatmapProperties>

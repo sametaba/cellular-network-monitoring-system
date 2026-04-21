@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:admin@localhost:5432/cellular_monitoring"
 
     # App
-    APP_ENV: str = "development"
-    APP_DEBUG: bool = True
+    APP_ENV: str = "production"
+    APP_DEBUG: bool = False  # Override in .env for local development: APP_DEBUG=True
     APP_TITLE: str = "AI Assisted Cellular Network Monitor"
     APP_VERSION: str = "0.1.0"
 
