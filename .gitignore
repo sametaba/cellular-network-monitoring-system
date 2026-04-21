@@ -1,0 +1,15 @@
+# Sanal Ortamlar (İkisi de güvende olacak)
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Çevresel Değişkenler (Şifrelerimiz)
+.env
+
+# Frontend gereksizleri
+frontend/node_modules/
+frontend/dist/
+
+# Veritabanı artıkları
+pgdata/
