@@ -22,6 +22,7 @@ export const SOURCE_POLYGON = 'heatmap'
 // ── Layer IDs (bottom → top render order) ───────────────────────
 export const LAYER_FILL = 'heatmap-fill'
 export const LAYER_OUTLINE = 'heatmap-outline'
+export const LAYER_SELECTED_GLOW = 'heatmap-selected-glow'
 export const LAYER_SELECTED = 'heatmap-selected'
 export const LAYER_OUTLINE_AI = 'heatmap-outline-ai'
 
