@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Activity } from 'lucide-react'
 
 export default function Footer() {
   return (
@@ -7,9 +6,10 @@ export default function Footer() {
       <div className="footer__inner">
         <div>
           <div className="footer__brand-name">
-            <Activity size={18} style={{ color: 'var(--accent-light)' }} />
-            CellScope
+            <img src="/bars-logo.svg" alt="BARS" className="footer__logo-img" />
+            BARS
           </div>
+          <p className="footer__brand-tagline">See Every Bar</p>
           <p className="footer__brand-desc">
             Hücresel ağ kalitesini gerçek zamanlı izleyin, AI destekli tahminlerle kapsama alanını analiz edin.
           </p>
@@ -35,7 +35,7 @@ export default function Footer() {
       </div>
 
       <div className="footer__bottom">
-        <span>&copy; {new Date().getFullYear()} CellScope. Tüm hakları saklıdır.</span>
+        <span>&copy; {new Date().getFullYear()} BARS. All rights reserved.</span>
         <span>Istanbul, Türkiye</span>
       </div>
     </footer>
