@@ -538,8 +538,13 @@ html, body, #root {
   color: var(--text-primary);
 }
 
-.navbar__logo-icon {
-  color: var(--accent-light);
+.navbar__logo-img {
+  height: 40px;
+  width: auto;
+}
+
+@media (max-width: 768px) {
+  .navbar__logo-img { height: 32px; }
 }
 
 .navbar__logo-text {
@@ -943,6 +948,20 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.footer__logo-img {
+  height: 24px;
+  width: auto;
+}
+
+.footer__brand-tagline {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-light);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 
 .footer__brand-desc {

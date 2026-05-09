@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { Activity, Menu, X, ArrowRight } from 'lucide-react'
+import { Menu, X, ArrowRight } from 'lucide-react'
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -18,8 +18,8 @@ export default function Navbar() {
   return (
     <nav className={`navbar${scrolled ? ' navbar--scrolled' : ''}`}>
       <Link to="/" className="navbar__logo">
-        <Activity size={22} className="navbar__logo-icon" />
-        <span className="navbar__logo-text">CellScope</span>
+        <img src="/bars-logo.svg" alt="BARS" className="navbar__logo-img" />
+        <span className="navbar__logo-text">BARS</span>
       </Link>
 
       <div className="navbar__links">
