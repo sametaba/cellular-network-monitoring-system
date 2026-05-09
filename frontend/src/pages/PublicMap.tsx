@@ -45,6 +45,12 @@ export default function PublicMap() {
   const abortRef = useRef<AbortController | null>(null)
   const predictAbortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const selectedFeatureRef = useRef<HeatmapFeature | null>(null)
+
+  // ── Keep selectedFeatureRef in sync with state ────────────
+  useEffect(() => {
+    selectedFeatureRef.current = selectedFeature
+  }, [selectedFeature])
 
   // ── Compute H3 neighbors when selection changes ────────────
   useEffect(() => {
@@ -55,6 +61,15 @@ export default function PublicMap() {
     const disk = gridDisk(selectedFeature.properties.grid_index, 3)
     setNeighborIndices(disk.filter((idx) => idx !== selectedFeature.properties.grid_index))
   }, [selectedFeature])
+
+  // ── Re-fetch when selection is cleared ────────────────────
+  // When the user deselects, the guard in handleBoundsChange is lifted.
+  // Re-fetch immediately so the full viewport is repopulated.
+  useEffect(() => {
+    if (!selectedFeature && bboxRef.current) {
+      loadData(bboxRef.current, operatorId)
+    }
+  }, [selectedFeature]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Trigger map.resize() after CSS grid transition (280ms) ─
   useEffect(() => {
@@ -120,6 +135,9 @@ export default function PublicMap() {
       bboxRef.current = bbox
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
+        // Skip reload while a feature is selected — resize/flyTo moveend events
+        // must not replace the visible data while the user is examining a hex.
+        if (selectedFeatureRef.current) return
         loadData(bbox, operatorId)
       }, 400)
     },

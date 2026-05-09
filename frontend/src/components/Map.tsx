@@ -7,6 +7,8 @@ import {
   ISTANBUL,
   INITIAL_ZOOM,
   ZOOM_HEX_VISIBLE,
+  ZOOM_FLY_TO,
+  FLY_TO_DURATION,
   SOURCE_POLYGON,
   LAYER_FILL,
   LAYER_OUTLINE,
@@ -16,6 +18,7 @@ import {
   SOURCE_PARENT_HEX,
   LAYER_PARENT_BORDER,
 } from '../constants/map'
+import { polygonCentroid } from '../utils/geo'
 
 interface MapProps {
   data: HeatmapCollection
@@ -209,6 +212,12 @@ export default function Map({
       if (!e.features?.length) return
       const feature = e.features[0] as unknown as HeatmapFeature
       onFeatureSelect(feature)
+
+      // Fly to the clicked hex (only if not already zoomed in enough)
+      if (map.getZoom() < ZOOM_FLY_TO) {
+        const center = polygonCentroid(feature.geometry.coordinates[0])
+        map.flyTo({ center, zoom: ZOOM_FLY_TO, duration: FLY_TO_DURATION })
+      }
     })
 
     // ── Click: empty area deselects ──────────────────────────
