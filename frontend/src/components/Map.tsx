@@ -2,18 +2,16 @@ import { useEffect, useRef, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { HeatmapCollection, HeatmapFeature } from '../types/heatmap'
-import { polygonCentroid } from '../utils/geo'
 import {
   BASEMAP,
   ISTANBUL,
   INITIAL_ZOOM,
   ZOOM_HEX_VISIBLE,
-  ZOOM_FLY_TO,
-  FLY_TO_DURATION,
   SOURCE_POLYGON,
   LAYER_FILL,
   LAYER_OUTLINE,
   LAYER_OUTLINE_AI,
+  LAYER_SELECTED_GLOW,
   LAYER_SELECTED,
   SOURCE_PARENT_HEX,
   LAYER_PARENT_BORDER,
@@ -24,6 +22,7 @@ interface MapProps {
   onBoundsChange: (bbox: string) => void
   onFeatureSelect: (feature: HeatmapFeature | null) => void
   selectedFeatureId: string | null
+  neighborIndices: string[]
   onMapReady?: (map: maplibregl.Map) => void
   parentHexGeojson?: HeatmapCollection | null
 }
@@ -33,6 +32,7 @@ export default function Map({
   onBoundsChange,
   onFeatureSelect,
   selectedFeatureId,
+  neighborIndices,
   onMapReady,
   parentHexGeojson,
 }: MapProps) {
@@ -69,7 +69,7 @@ export default function Map({
         generateId: true,
       })
 
-      // ── Layer 1: Hex fill (quality-colored, static opacity) ──
+      // ── Layer 1: Hex fill (quality-colored) ──────────────────
       map.addLayer({
         id: LAYER_FILL,
         type: 'fill',
@@ -87,15 +87,11 @@ export default function Map({
           ],
           'fill-opacity': [
             'case',
-            // AI-predicted cells: semi-transparent
-            ['==', ['get', 'is_ai_predicted'], true],
-            0.35,
-            // Hovered real cells: bright
-            ['boolean', ['feature-state', 'hovered'], false],
-            0.75,
-            // Default real cells: clear and readable
+            ['==', ['get', 'is_ai_predicted'], true], 0.35,
+            ['boolean', ['feature-state', 'hovered'], false], 0.75,
             0.6,
           ],
+          'fill-opacity-transition': { duration: 250, delay: 0 },
         },
       })
 
@@ -131,14 +127,29 @@ export default function Map({
         },
       })
 
-      // ── Layer 4: Selected hex highlight ──────────────────────
+      // ── Layer 4a: Selected hex glow (wide blur) ───────────────
+      map.addLayer({
+        id: LAYER_SELECTED_GLOW,
+        type: 'line',
+        source: SOURCE_POLYGON,
+        minzoom: ZOOM_HEX_VISIBLE,
+        paint: {
+          'line-color': '#F2EAD3',
+          'line-width': 8,
+          'line-blur': 4,
+          'line-opacity': 0.6,
+        },
+        filter: ['==', ['get', 'grid_index'], ''],
+      })
+
+      // ── Layer 4b: Selected hex sharp border ───────────────────
       map.addLayer({
         id: LAYER_SELECTED,
         type: 'line',
         source: SOURCE_POLYGON,
         minzoom: ZOOM_HEX_VISIBLE,
         paint: {
-          'line-color': '#818cf8',
+          'line-color': '#F2EAD3',
           'line-width': 3,
           'line-opacity': 1,
         },
@@ -193,32 +204,19 @@ export default function Map({
       }
     })
 
-    // ── Click handling ───────────────────────────────────────
-    // Boolean flag: layer-specific handler fires BEFORE the general handler
-    // in the same synchronous tick, so this is race-condition free.
-    let clickHandled = false
-
-    // Click: hex selection
+    // ── Click: hex selection ─────────────────────────────────
     map.on('click', LAYER_FILL, (e) => {
       if (!e.features?.length) return
-      clickHandled = true
       const feature = e.features[0] as unknown as HeatmapFeature
       onFeatureSelect(feature)
-
-      // Only fly if user is zoomed far out; avoid animation interference on re-clicks
-      if (map.getZoom() < 13) {
-        const center = polygonCentroid(feature.geometry.coordinates[0])
-        map.flyTo({ center, zoom: ZOOM_FLY_TO, duration: FLY_TO_DURATION })
-      }
     })
 
-    // Click: empty area deselects (only when no hex was hit)
-    map.on('click', () => {
-      if (clickHandled) {
-        clickHandled = false
-        return
+    // ── Click: empty area deselects ──────────────────────────
+    map.on('click', (e) => {
+      const hits = map.queryRenderedFeatures(e.point, { layers: [LAYER_FILL] })
+      if (hits.length === 0) {
+        onFeatureSelect(null)
       }
-      onFeatureSelect(null)
     })
 
     // ── Debounced moveend → update bbox ──────────────────────
@@ -246,16 +244,46 @@ export default function Map({
     polySrc?.setData(data)
   }, [data])
 
-  // ── Update selected feature highlight ──────────────────────
+  // ── 3-tier opacity based on selection + neighbors ──────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.getLayer(LAYER_FILL)) return
+
+    if (!selectedFeatureId) {
+      map.setPaintProperty(LAYER_FILL, 'fill-opacity', [
+        'case',
+        ['==', ['get', 'is_ai_predicted'], true], 0.35,
+        ['boolean', ['feature-state', 'hovered'], false], 0.75,
+        0.6,
+      ])
+      return
+    }
+
+    map.setPaintProperty(LAYER_FILL, 'fill-opacity', [
+      'case',
+      // Tier 1: selected hex — full opacity
+      ['==', ['get', 'grid_index'], selectedFeatureId], 0.9,
+      // Tier 2: neighbors within ring 3 — medium opacity
+      ['in', ['get', 'grid_index'], ['literal', neighborIndices]], 0.6,
+      // Tier 3: everything else — very dim
+      0.2,
+    ])
+  }, [selectedFeatureId, neighborIndices])
+
+  // ── Update selected hex highlight (glow + border) ──────────
   useEffect(() => {
     const map = mapRef.current
     if (!map || !map.getLayer(LAYER_SELECTED)) return
 
-    map.setFilter(LAYER_SELECTED, [
+    const filter: maplibregl.FilterSpecification = [
       '==',
       ['get', 'grid_index'],
       selectedFeatureId ?? '',
-    ])
+    ]
+    map.setFilter(LAYER_SELECTED, filter)
+    if (map.getLayer(LAYER_SELECTED_GLOW)) {
+      map.setFilter(LAYER_SELECTED_GLOW, filter)
+    }
   }, [selectedFeatureId])
 
   // ── Update parent hex border source ──────────────────────

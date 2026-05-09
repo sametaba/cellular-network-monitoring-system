@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import maplibregl from 'maplibre-gl'
-import { cellToBoundary } from 'h3-js'
+import { cellToBoundary, gridDisk } from 'h3-js'
 import { ArrowLeft } from 'lucide-react'
 import Map from '../components/Map'
 import FilterPanel from '../components/FilterPanel'
@@ -35,6 +35,7 @@ export default function PublicMap() {
   const [operatorId, setOperatorId] = useState('28601')
   const [geoData, setGeoData] = useState<HeatmapCollection>(EMPTY_COLLECTION)
   const [selectedFeature, setSelectedFeature] = useState<HeatmapFeature | null>(null)
+  const [neighborIndices, setNeighborIndices] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [parentLoading, setParentLoading] = useState(false)
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
@@ -44,6 +45,34 @@ export default function PublicMap() {
   const abortRef = useRef<AbortController | null>(null)
   const predictAbortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Compute H3 neighbors when selection changes ────────────
+  useEffect(() => {
+    if (!selectedFeature) {
+      setNeighborIndices([])
+      return
+    }
+    const disk = gridDisk(selectedFeature.properties.grid_index, 3)
+    setNeighborIndices(disk.filter((idx) => idx !== selectedFeature.properties.grid_index))
+  }, [selectedFeature])
+
+  // ── Trigger map.resize() after CSS grid transition (280ms) ─
+  useEffect(() => {
+    const timer = setTimeout(() => { mapInstance?.resize() }, 280)
+    return () => clearTimeout(timer)
+  }, [selectedFeature, mapInstance])
+
+  // ── ESC to clear selection ─────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedFeature(null)
+        setParentHexGeo(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // ── Load data (always res-9) + AI predictions ─────────────
   const loadData = useCallback(
@@ -151,15 +180,12 @@ export default function PublicMap() {
         })
 
         // Fly to the CURRENT child hex centroid, zoom out to parent level.
-        // This keeps the user's focus point centered while zooming out.
         const targetZoom = PARENT_ZOOM_MAP[resolution] ?? 11.5
 
         let flyCenter: [number, number]
         if (selectedFeature) {
-          // Stay centered on where the user was looking
           flyCenter = polygonCentroid(selectedFeature.geometry.coordinates[0])
         } else {
-          // Fallback: parent hex centroid
           flyCenter = [
             coords.reduce((s, c) => s + c[0], 0) / coords.length,
             coords.reduce((s, c) => s + c[1], 0) / coords.length,
@@ -181,7 +207,10 @@ export default function PublicMap() {
   )
 
   return (
-    <div className="map-layout">
+    <div
+      className="map-layout"
+      style={{ '--sidebar-width': selectedFeature ? '320px' : '0px' } as React.CSSProperties}
+    >
       <FilterPanel
         operatorId={operatorId}
         featureCount={geoData.features.length}
@@ -199,6 +228,7 @@ export default function PublicMap() {
           onBoundsChange={handleBoundsChange}
           onFeatureSelect={setSelectedFeature}
           selectedFeatureId={selectedFeature?.properties.grid_index ?? null}
+          neighborIndices={neighborIndices}
           onMapReady={setMapInstance}
           parentHexGeojson={parentHexGeo}
         />
