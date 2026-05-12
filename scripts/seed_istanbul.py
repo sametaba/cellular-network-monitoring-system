@@ -66,7 +66,7 @@ from app.services.ingestion import bulk_insert  # noqa: E402
 # ---------------------------------------------------------------------------
 
 TOTAL_MEASUREMENTS = 500_000
-BATCH_SIZE = 10_000
+BATCH_SIZE = 2_000 # asyncpg max 32767 query args; 12 cols × 2000 ≈ 24000 safe
 DAYS_BACK = 7  # timestamps spread uniformly over this many days
 
 DISTRICTS: dict[str, tuple[float, float, float, float]] = {
